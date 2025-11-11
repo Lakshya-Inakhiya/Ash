@@ -1,0 +1,12 @@
+pillow
+google-generativeai
+gTTS
+pygame
+adafruit-circuitpython-pca9685
+adafruit-circuitpython-motor
+sounddevice
+soundfile
+numpy
+pyyaml
+python-dotenv
+
