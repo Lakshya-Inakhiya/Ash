@@ -246,8 +246,15 @@ scp -r Ash-1 pi@raspberrypi.local:~/Ash
 
 ### Step 3.2: Install LCD Driver
 
+**⚠️ Important: Ensure network connectivity before proceeding!**
+
 ```bash
 # On Pi
+# First, install required dependencies manually
+sudo apt-get update
+sudo apt-get install -y cmake build-essential git xserver-xorg-input-evdev
+
+# Now install LCD driver
 cd ~
 sudo rm -rf LCD-show
 git clone https://github.com/goodtft/LCD-show.git
@@ -256,8 +263,15 @@ cd LCD-show
 
 # Install driver (will reboot)
 sudo ./LCD35-show
+```
 
-# After reboot, SSH back in and rotate:
+**⚠️ If you see "bad network, can't install cmake!!!" error:**
+- Install cmake manually first: `sudo apt-get install -y cmake build-essential`
+- Then re-run: `sudo ./LCD35-show`
+- Or use the fix script: See `LCD_TROUBLESHOOTING.md`
+
+**After reboot, SSH back in and rotate:**
+```bash
 cd ~/LCD-show
 sudo ./rotate.sh 90
 sudo reboot
@@ -267,6 +281,7 @@ sudo reboot
 - LCD should display Raspberry Pi desktop
 - Resolution should be 480×320 (landscape)
 - Touch screen should work (if applicable)
+- Verify framebuffer: `ls -l /dev/fb*` (should show `/dev/fb1`)
 
 ### Step 3.3: Enable I2C Interface
 
@@ -383,9 +398,11 @@ python3 src/face_display.py
 - ✅ Images are clear and properly sized (480×320)
 
 **If Issues:**
-- Check LCD driver: `cd ~/LCD-show && sudo ./LCD35-show`
-- Check framebuffer: `ls -l /dev/fb*` (should show `/dev/fb1`)
-- Check rotation: `cd ~/LCD-show && sudo ./rotate.sh 90`
+- **No /dev/fb1 found:** See `LCD_TROUBLESHOOTING.md` for detailed fix
+- **Network error during installation:** Install cmake manually: `sudo apt-get install -y cmake build-essential`, then re-run `sudo ./LCD35-show`
+- **Check framebuffer:** `ls -l /dev/fb*` (should show `/dev/fb1`)
+- **Check rotation:** `cd ~/LCD-show && sudo ./rotate.sh 90`
+- **Permission denied:** Add user to video group: `sudo usermod -a -G video $USER` (logout/login required)
 
 ### Test 4.2: PCA9685 Communication
 
