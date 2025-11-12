@@ -7,9 +7,28 @@
 - LCD screen is blank or not working
 - Face display test runs in simulation mode only
 - Network error during `LCD35-show` installation: "bad network, can't install cmake!!!"
+- **On Raspberry Pi 5:** Error: "fatal error: bcm_host.h: No such file or directory"
+
+### ⚠️ IMPORTANT: Raspberry Pi 5 Incompatibility
+
+**The `goodtft/LCD-show` repository does NOT work on Raspberry Pi 5!**
+
+The `LCD35-show` script uses old VideoCore APIs (`bcm_host.h`, `libraspberrypi-dev`) that don't exist on Pi 5. If you see errors like:
+
+```
+fatal error: bcm_host.h: No such file or directory
+Package 'libraspberrypi-dev' has no installation candidate
+```
+
+**You need to use a different approach for Pi 5.** See `PI5_LCD_FIX.md` and `PI5_SETUP_GUIDE.md` for Pi 5 specific solutions.
 
 ### Root Cause
+
+**For Raspberry Pi 4 and earlier:**
 The `LCD35-show` script failed to install `cmake` due to network issues, preventing the LCD driver from being compiled and installed.
+
+**For Raspberry Pi 5:**
+The `LCD35-show` script is **fundamentally incompatible** with Pi 5 because it uses deprecated VideoCore APIs that don't exist on Pi 5. Even with cmake installed, the driver won't compile because `bcm_host.h` and other VideoCore headers don't exist on Pi 5.
 
 ### Solution
 

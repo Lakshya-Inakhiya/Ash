@@ -54,15 +54,37 @@ class FaceDisplay:
         # Check if running on Pi with framebuffer
         self.has_framebuffer = os.path.exists(self.fb_path)
         
+        # SPI driver for Pi 5 (when framebuffer not available)
+        self.spi_driver = None
+        self.use_spi = False
+        
         # Pygame window for simulation mode
         self.window = None
         self.screen = None
         
-        if not self.has_framebuffer:
+        # Try to initialize display backend (in order of preference)
+        if self.has_framebuffer:
+            print(f"Framebuffer detected: {self.fb_path}")
+        else:
             print(f"Warning: Framebuffer {self.fb_path} not found.")
-            print("Face display will run in simulation mode with pygame window.")
-            print("This is normal when developing on Mac. Deploy to Pi for actual display.")
-            self._init_pygame_window()
+            # Try SPI driver (for Pi 5)
+            try:
+                # Only try SPI on Raspberry Pi (not on Mac)
+                if os.path.exists('/proc/device-tree/model'):
+                    from lcd_spi_driver import ILI9486SPI
+                    self.spi_driver = ILI9486SPI(
+                        width=self.width,
+                        height=self.height
+                    )
+                    self.use_spi = True
+                    print("Using direct SPI driver for LCD (Pi 5 compatible)")
+                else:
+                    raise ImportError("Not running on Raspberry Pi")
+            except Exception as e:
+                print(f"SPI driver not available: {e}")
+                print("Face display will run in simulation mode with pygame window.")
+                print("This is normal when developing on Mac. Deploy to Pi for actual display.")
+                self._init_pygame_window()
         
         # Load all face images into cache
         self._load_images()
@@ -148,6 +170,15 @@ class FaceDisplay:
             except Exception as e:
                 print(f"Error writing to framebuffer: {e}")
                 return False
+        elif self.use_spi and self.spi_driver:
+            # Use SPI driver (for Pi 5)
+            try:
+                self.spi_driver.display_image(img)
+                self.current_expression = expression
+                return True
+            except Exception as e:
+                print(f"Error displaying on SPI LCD: {e}")
+                return False
         else:
             # Simulation mode (for development on Mac) - show in pygame window
             try:
@@ -209,6 +240,12 @@ class FaceDisplay:
                 self.current_expression = None
             except Exception as e:
                 print(f"Error clearing display: {e}")
+        elif self.use_spi and self.spi_driver:
+            try:
+                self.spi_driver.clear((0, 0, 0))
+                self.current_expression = None
+            except Exception as e:
+                print(f"Error clearing SPI display: {e}")
         else:
             # Clear pygame window
             if self.screen:
@@ -248,6 +285,13 @@ class FaceDisplay:
         """
         self.clear()
         self.image_cache.clear()
+        
+        # Close SPI driver if it was initialized
+        if self.spi_driver is not None:
+            try:
+                self.spi_driver.close()
+            except Exception as e:
+                print(f"Error closing SPI driver: {e}")
         
         # Quit pygame if it was initialized
         if self.screen is not None:

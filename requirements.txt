@@ -9,4 +9,6 @@ soundfile
 numpy
 pyyaml
 python-dotenv
+spidev
+RPi.GPIO
 
