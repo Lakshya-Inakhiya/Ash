@@ -104,7 +104,7 @@ class FaceDisplay:
                     # Ensure correct size
                     if img.size != (self.width, self.height):
                         print(f"Resizing {expression}.png from {img.size} to {self.width}x{self.height}")
-                        img = img.resize((self.width, self.height), Image.LANCZOS)
+                        img = img.resize((self.width, self.height), Image.Resampling.LANCZOS)
                     
                     # Convert to RGB (framebuffer expects RGB)
                     img = img.convert('RGB')
