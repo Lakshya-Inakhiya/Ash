@@ -8,7 +8,19 @@ Works on Raspberry Pi 5 where goodtft/LCD-show doesn't work.
 
 import time
 import spidev
-import RPi.GPIO as GPIO
+try:
+    import gpiod
+    GPIO_AVAILABLE = True
+    USE_GPIOD = True
+except ImportError:
+    # Fallback for older Pi models (though this driver is for Pi 5)
+    try:
+        import RPi.GPIO as GPIO
+        GPIO_AVAILABLE = True
+        USE_GPIOD = False
+    except ImportError:
+        GPIO_AVAILABLE = False
+        USE_GPIOD = False
 from PIL import Image
 import numpy as np
 
@@ -55,12 +67,52 @@ class ILI9486SPI:
         self.rst_pin = rst_pin
         self.bl_pin = bl_pin
         
-        # Setup GPIO
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
-        GPIO.setup(self.dc_pin, GPIO.OUT)
-        GPIO.setup(self.rst_pin, GPIO.OUT)
-        GPIO.setup(self.bl_pin, GPIO.OUT)
+        # Setup GPIO using gpiod (for Raspberry Pi 5)
+        if GPIO_AVAILABLE and USE_GPIOD:
+            # On Pi 5, GPIO chip is usually gpiochip4, but auto-detect if needed
+            chip_found = False
+            for chip_name in ['gpiochip4', 'gpiochip0']:
+                try:
+                    self.chip = gpiod.Chip(chip_name, gpiod.Chip.OPEN_BY_NAME)
+                    chip_found = True
+                    break
+                except:
+                    continue
+            
+            if not chip_found:
+                # Try to find any available GPIO chip
+                try:
+                    import os
+                    gpio_chips = [f for f in os.listdir('/dev') if f.startswith('gpiochip')]
+                    if gpio_chips:
+                        # Sort and try the first one
+                        gpio_chips.sort()
+                        self.chip = gpiod.Chip(gpio_chips[0], gpiod.Chip.OPEN_BY_NAME)
+                        chip_found = True
+                except:
+                    pass
+            
+            if not chip_found:
+                raise RuntimeError("Failed to open GPIO chip. Make sure gpiod is installed: sudo apt install python3-libgpiod")
+            
+            # Request GPIO lines as outputs
+            self.dc_line = self.chip.get_line(self.dc_pin)
+            self.rst_line = self.chip.get_line(self.rst_pin)
+            self.bl_line = self.chip.get_line(self.bl_pin)
+            
+            self.dc_line.request(consumer='lcd_dc', type=gpiod.LINE_REQ_DIR_OUT)
+            self.rst_line.request(consumer='lcd_rst', type=gpiod.LINE_REQ_DIR_OUT)
+            self.bl_line.request(consumer='lcd_bl', type=gpiod.LINE_REQ_DIR_OUT)
+        elif GPIO_AVAILABLE and not USE_GPIOD:
+            # Fallback to RPi.GPIO for older Pi models
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setwarnings(False)
+            GPIO.setup(self.dc_pin, GPIO.OUT)
+            GPIO.setup(self.rst_pin, GPIO.OUT)
+            GPIO.setup(self.bl_pin, GPIO.OUT)
+            self.chip = None
+        else:
+            raise RuntimeError("No GPIO library available. Install gpiod or RPi.GPIO.")
         
         # Setup SPI
         self.spi = spidev.SpiDev()
@@ -71,14 +123,35 @@ class ILI9486SPI:
         # Initialize display
         self._init_display()
     
+    def _set_dc(self, value):
+        """Set DC pin (Data/Command) - LOW for command, HIGH for data."""
+        if GPIO_AVAILABLE and USE_GPIOD:
+            self.dc_line.set_value(value)
+        else:
+            GPIO.output(self.dc_pin, GPIO.LOW if value == 0 else GPIO.HIGH)
+    
+    def _set_rst(self, value):
+        """Set RST pin - HIGH for normal operation, LOW for reset."""
+        if GPIO_AVAILABLE and USE_GPIOD:
+            self.rst_line.set_value(value)
+        else:
+            GPIO.output(self.rst_pin, GPIO.LOW if value == 0 else GPIO.HIGH)
+    
+    def _set_bl(self, value):
+        """Set BL pin (Backlight) - HIGH to enable, LOW to disable."""
+        if GPIO_AVAILABLE and USE_GPIOD:
+            self.bl_line.set_value(value)
+        else:
+            GPIO.output(self.bl_pin, GPIO.LOW if value == 0 else GPIO.HIGH)
+    
     def _write_command(self, cmd):
         """Write a command byte to the LCD."""
-        GPIO.output(self.dc_pin, GPIO.LOW)  # Command mode
+        self._set_dc(0)  # Command mode
         self.spi.xfer2([cmd])
     
     def _write_data(self, data):
         """Write data bytes to the LCD."""
-        GPIO.output(self.dc_pin, GPIO.HIGH)  # Data mode
+        self._set_dc(1)  # Data mode
         if isinstance(data, int):
             self.spi.xfer2([data])
         else:
@@ -87,11 +160,11 @@ class ILI9486SPI:
     def _init_display(self):
         """Initialize the ILI9486 display."""
         # Reset display
-        GPIO.output(self.rst_pin, GPIO.HIGH)
+        self._set_rst(1)
         time.sleep(0.01)
-        GPIO.output(self.rst_pin, GPIO.LOW)
+        self._set_rst(0)
         time.sleep(0.01)
-        GPIO.output(self.rst_pin, GPIO.HIGH)
+        self._set_rst(1)
         time.sleep(0.12)
         
         # Software reset
@@ -129,7 +202,7 @@ class ILI9486SPI:
         time.sleep(0.02)
         
         # Enable backlight
-        GPIO.output(self.bl_pin, GPIO.HIGH)
+        self._set_bl(1)
     
     def set_window(self, x0, y0, x1, y1):
         """Set the display window for writing."""
@@ -177,7 +250,7 @@ class ILI9486SPI:
         
         # Send pixel data in chunks
         chunk_size = 4096  # Send in chunks to avoid buffer overflow
-        GPIO.output(self.dc_pin, GPIO.HIGH)  # Data mode
+        self._set_dc(1)  # Data mode
         
         for i in range(0, len(byte_data), chunk_size):
             chunk = byte_data[i:i + chunk_size]
@@ -193,9 +266,20 @@ class ILI9486SPI:
     
     def close(self):
         """Clean up resources."""
-        GPIO.output(self.bl_pin, GPIO.LOW)  # Turn off backlight
+        self._set_bl(0)  # Turn off backlight
         self.spi.close()
-        GPIO.cleanup()
+        if GPIO_AVAILABLE and USE_GPIOD:
+            # Release GPIO lines
+            if hasattr(self, 'dc_line'):
+                self.dc_line.release()
+            if hasattr(self, 'rst_line'):
+                self.rst_line.release()
+            if hasattr(self, 'bl_line'):
+                self.bl_line.release()
+            if hasattr(self, 'chip'):
+                self.chip.close()
+        else:
+            GPIO.cleanup()
 
 
 def test_spi_lcd():

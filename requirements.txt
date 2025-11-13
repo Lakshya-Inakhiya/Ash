@@ -10,5 +10,6 @@ numpy
 pyyaml
 python-dotenv
 spidev
+gpiod
 RPi.GPIO
 
