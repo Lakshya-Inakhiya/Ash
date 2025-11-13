@@ -31,7 +31,7 @@ class ILI9486SPI:
     CMD_PIXFMT = 0x3A
     
     def __init__(self, width=480, height=320, spi_bus=0, spi_device=0, 
-                 dc_pin=25, rst_pin=27, bl_pin=18):
+                 dc_pin=24, rst_pin=25, bl_pin=18, speed_hz=32000000, rotation=1):
         """
         Initialize ILI9486 LCD via SPI.
         
@@ -40,14 +40,17 @@ class ILI9486SPI:
             height: Display height in pixels (default: 320)
             spi_bus: SPI bus number (default: 0)
             spi_device: SPI device number (default: 0)
-            dc_pin: Data/Command pin (GPIO number)
-            rst_pin: Reset pin (GPIO number)
-            bl_pin: Backlight pin (GPIO number)
+            dc_pin: Data/Command pin (GPIO number, default: 24)
+            rst_pin: Reset pin (GPIO number, default: 25)
+            bl_pin: Backlight pin (GPIO number, default: 18)
+            speed_hz: SPI speed in Hz (default: 32000000 = 32 MHz)
+            rotation: Display rotation (0-3, default: 1 = 90 degrees)
         """
         self.width = width
         self.height = height
+        self.rotation = rotation
         
-        # GPIO pins (defaults for 3.5" LCD)
+        # GPIO pins (defaults match old code: DC=24, RST=25)
         self.dc_pin = dc_pin
         self.rst_pin = rst_pin
         self.bl_pin = bl_pin
@@ -62,7 +65,7 @@ class ILI9486SPI:
         # Setup SPI
         self.spi = spidev.SpiDev()
         self.spi.open(spi_bus, spi_device)
-        self.spi.max_speed_hz = 64000000  # 64 MHz
+        self.spi.max_speed_hz = speed_hz
         self.spi.mode = 0b00
         
         # Initialize display
@@ -103,9 +106,23 @@ class ILI9486SPI:
         self._write_command(self.CMD_PIXFMT)
         self._write_data(0x55)  # 16-bit format
         
-        # Set memory access control (MADCTL)
+        # Set memory access control (MADCTL) based on rotation
+        # MADCTL bits: MY(7) MX(6) MV(5) ML(4) BGR(3) MH(2) - (0-1 unused)
+        # Rotation values:
+        #   0: Normal (0x08 = BGR)
+        #   1: 90° clockwise (0x28 = BGR + MY + MV)
+        #   2: 180° (0xC8 = BGR + MY + MX)
+        #   3: 270° clockwise (0xE8 = BGR + MY + MX + MV)
+        rotation_madctl = {
+            0: 0x08,  # Normal, BGR
+            1: 0x28,  # 90° clockwise, BGR + MY + MV
+            2: 0xC8,  # 180°, BGR + MY + MX
+            3: 0xE8,  # 270° clockwise, BGR + MY + MX + MV
+        }
+        madctl_value = rotation_madctl.get(self.rotation, 0x28)  # Default to rotation 1
+        
         self._write_command(self.CMD_MADCTL)
-        self._write_data(0x48)  # BGR order, rotate 90 degrees
+        self._write_data(madctl_value)
         
         # Display on
         self._write_command(self.CMD_DISPON)

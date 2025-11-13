@@ -72,12 +72,25 @@ class FaceDisplay:
                 # Only try SPI on Raspberry Pi (not on Mac)
                 if os.path.exists('/proc/device-tree/model'):
                     from lcd_spi_driver import ILI9486SPI
+                    
+                    # Get SPI configuration from settings
+                    spi_config = config.get('display', {}).get('spi', {})
                     self.spi_driver = ILI9486SPI(
                         width=self.width,
-                        height=self.height
+                        height=self.height,
+                        spi_bus=spi_config.get('bus', 0),
+                        spi_device=spi_config.get('device', 0),
+                        dc_pin=spi_config.get('dc_pin', 24),
+                        rst_pin=spi_config.get('rst_pin', 25),
+                        bl_pin=spi_config.get('bl_pin', 18),
+                        speed_hz=spi_config.get('speed_hz', 32000000),
+                        rotation=spi_config.get('rotation', 1)
                     )
                     self.use_spi = True
-                    print("Using direct SPI driver for LCD (Pi 5 compatible)")
+                    print(f"Using direct SPI driver for LCD (Pi 5 compatible)")
+                    print(f"  SPI: bus={spi_config.get('bus', 0)}, device={spi_config.get('device', 0)}")
+                    print(f"  Pins: DC={spi_config.get('dc_pin', 24)}, RST={spi_config.get('rst_pin', 25)}, BL={spi_config.get('bl_pin', 18)}")
+                    print(f"  Speed: {spi_config.get('speed_hz', 32000000) // 1000000} MHz, Rotation: {spi_config.get('rotation', 1)}")
                 else:
                     raise ImportError("Not running on Raspberry Pi")
             except Exception as e:

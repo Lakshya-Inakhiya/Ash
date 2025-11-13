@@ -7,6 +7,15 @@ display:
     width: 480
     height: 320
   faces_directory: "assets/faces"
+  # SPI LCD Configuration (for Raspberry Pi 5)
+  spi:
+    bus: 0              # SPI bus number
+    device: 0           # SPI device number
+    dc_pin: 24          # Data/Command pin (GPIO)
+    rst_pin: 25         # Reset pin (GPIO)
+    bl_pin: 18          # Backlight pin (GPIO)
+    speed_hz: 32000000  # SPI speed in Hz (32 MHz)
+    rotation: 1         # Display rotation (0-3, where 1 = 90 degrees)
 
 # Servo/Gesture Settings
 servos:
