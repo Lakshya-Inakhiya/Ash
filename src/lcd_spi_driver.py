@@ -12,6 +12,13 @@ try:
     import gpiod
     GPIO_AVAILABLE = True
     USE_GPIOD = True
+    # Verify gpiod can actually be used
+    try:
+        # Test if we can list chips
+        import os
+        test_chips = [f for f in os.listdir('/dev') if f.startswith('gpiochip')]
+    except:
+        pass
 except ImportError:
     # Fallback for older Pi models (though this driver is for Pi 5)
     try:
@@ -71,29 +78,73 @@ class ILI9486SPI:
         if GPIO_AVAILABLE and USE_GPIOD:
             # On Pi 5, GPIO chip is usually gpiochip4, but auto-detect if needed
             chip_found = False
+            last_error = None
+            
+            # First, try common chip names
             for chip_name in ['gpiochip4', 'gpiochip0']:
                 try:
                     self.chip = gpiod.Chip(chip_name, gpiod.Chip.OPEN_BY_NAME)
                     chip_found = True
                     break
-                except:
+                except Exception as e:
+                    last_error = e
                     continue
             
+            # If not found, try to find any available GPIO chip
             if not chip_found:
-                # Try to find any available GPIO chip
                 try:
                     import os
                     gpio_chips = [f for f in os.listdir('/dev') if f.startswith('gpiochip')]
                     if gpio_chips:
-                        # Sort and try the first one
+                        # Sort and try each one (try by path first, then by name)
                         gpio_chips.sort()
-                        self.chip = gpiod.Chip(gpio_chips[0], gpiod.Chip.OPEN_BY_NAME)
-                        chip_found = True
-                except:
-                    pass
+                        for chip_name in gpio_chips:
+                            # Try opening by path
+                            try:
+                                chip_path = f'/dev/{chip_name}'
+                                self.chip = gpiod.Chip(chip_path, gpiod.Chip.OPEN_BY_PATH)
+                                chip_found = True
+                                break
+                            except Exception as e1:
+                                # Try opening by name
+                                try:
+                                    self.chip = gpiod.Chip(chip_name, gpiod.Chip.OPEN_BY_NAME)
+                                    chip_found = True
+                                    break
+                                except Exception as e2:
+                                    last_error = e2 if last_error is None else last_error
+                                    continue
+                except Exception as e:
+                    last_error = e
             
             if not chip_found:
-                raise RuntimeError("Failed to open GPIO chip. Make sure gpiod is installed: sudo apt install python3-libgpiod")
+                import os
+                error_msg = "Failed to open GPIO chip."
+                if last_error:
+                    error_msg += f" Last error: {last_error}"
+                
+                # Add diagnostic information
+                try:
+                    gpio_chips = [f for f in os.listdir('/dev') if f.startswith('gpiochip')]
+                    if gpio_chips:
+                        error_msg += f"\nFound GPIO chips: {', '.join(gpio_chips)}"
+                        # Check permissions
+                        for chip in gpio_chips:
+                            chip_path = f'/dev/{chip}'
+                            if os.path.exists(chip_path):
+                                stat_info = os.stat(chip_path)
+                                error_msg += f"\n  {chip_path}: mode {oct(stat_info.st_mode)[-3:]}, uid={stat_info.st_uid}, gid={stat_info.st_gid}"
+                    else:
+                        error_msg += "\nNo GPIO chips found in /dev/"
+                except Exception as e:
+                    error_msg += f"\nCould not check /dev/: {e}"
+                
+                error_msg += "\n\nTroubleshooting:"
+                error_msg += "\n1. Add user to gpio group: sudo usermod -a -G gpio $USER (then logout/login)"
+                error_msg += "\n2. Or fix permissions: sudo chmod 666 /dev/gpiochip*"
+                error_msg += "\n3. Verify gpiod: python3 -c 'import gpiod; print(gpiod.__version__)'"
+                error_msg += "\n4. Check if system gpiod conflicts with pip: pip uninstall gpiod (system package should be enough)"
+                raise RuntimeError(error_msg)
             
             # Request GPIO lines as outputs
             self.dc_line = self.chip.get_line(self.dc_pin)
