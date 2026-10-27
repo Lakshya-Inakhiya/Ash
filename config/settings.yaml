@@ -4,6 +4,8 @@ llm:
   # "gemini-flash-latest" always points at Google's current Flash model (free tier works).
   # If a model set here gets retired, Ash switches to another Flash model by itself.
   model: gemini-flash-latest
+  # Tried in order when the main model is overloaded or out of free quota.
+  backup_models: [gemini-flash-lite-latest, gemini-2.5-flash]
   system_instruction: >-
     You are Ash, a small, friendly desktop robot. Answer in 1-2 short sentences.
     Your replies are spoken aloud, so don't use markdown, lists or emoji.

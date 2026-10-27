@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 from google.genai import errors
 
-from ash.llm import resolve_model, to_contents
+from ash.llm import Gemini, resolve_model, to_contents
 
 
 def model(name, actions=("generateContent",)):
@@ -44,3 +44,48 @@ def test_to_contents_maps_roles():
     contents = to_contents([{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}])
     assert [c.role for c in contents] == ["user", "model"]
     assert contents[1].parts[0].text == "hello"
+
+
+class FlakyModels:
+    """Fails with the given error for the listed models, answers for the rest."""
+
+    def __init__(self, failures):
+        self.failures, self.tried = failures, []
+
+    def generate_content(self, model, contents, config):
+        self.tried.append(model)
+        if model in self.failures:
+            raise self.failures[model]
+        return SimpleNamespace(text=f"answer from {model}")
+
+
+def gemini(failures, backups=("backup-1", "backup-2")):
+    g = Gemini.__new__(Gemini)
+    g.client = SimpleNamespace(models=FlakyModels(failures))
+    g.model, g.backup_models, g.config = "main", list(backups), None
+    return g
+
+
+def test_uses_backup_model_when_main_is_overloaded():
+    g = gemini({"main": errors.ServerError(503, {"error": {"message": "high demand"}})})
+    assert g.reply([{"role": "user", "content": "hi"}]) == "answer from backup-1"
+
+
+def test_keeps_trying_backups_until_one_works():
+    quota = errors.ClientError(429, {"error": {"message": "quota"}})
+    g = gemini({"main": quota, "backup-1": quota})
+    assert g.reply([{"role": "user", "content": "hi"}]) == "answer from backup-2"
+
+
+def test_does_not_retry_errors_a_backup_cannot_fix():
+    g = gemini({"main": errors.ClientError(400, {"error": {"message": "bad request"}})})
+    with pytest.raises(errors.ClientError):
+        g.reply([{"role": "user", "content": "hi"}])
+    assert g.client.models.tried == ["main"]
+
+
+def test_raises_last_error_when_every_model_fails():
+    busy = errors.ServerError(503, {"error": {"message": "high demand"}})
+    g = gemini({"main": busy, "backup-1": busy, "backup-2": busy})
+    with pytest.raises(errors.ServerError):
+        g.reply([{"role": "user", "content": "hi"}])
