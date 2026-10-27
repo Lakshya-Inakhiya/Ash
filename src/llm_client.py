@@ -1,198 +1,82 @@
-"""
-LLM Client Module for Ash Robot.
+"""Gemini client: chat replies and speech-to-text."""
 
-This module provides a simple wrapper around the Google Gemini API
-for conversational AI functionality.
-"""
-
-import os
-import google.generativeai as genai
-from pathlib import Path
+from google import genai
+from google.genai import errors, types
 
 
 class LLMClient:
-    """
-    Client for interacting with Google's Gemini API.
-    
-    This class handles all communication with the Gemini API and provides
-    a simple interface for asking questions and getting concise responses.
-    """
-    
     def __init__(self, config, api_key):
-        """
-        Initialize the Gemini API client.
-        
-        Args:
-            config: Configuration dictionary with LLM settings
-            api_key: Google Gemini API key
-        """
-        self.config = config
-        self.model_name = config['llm']['model']
-        self.system_instruction = config['llm']['system_instruction']
-        self.max_tokens = config['llm']['max_tokens']
-        
-        # Configure the API
-        genai.configure(api_key=api_key)
-        
-        # Initialize the model
-        generation_config = {
-            "max_output_tokens": self.max_tokens,
-            "temperature": 0.7,  # Slightly creative but focused
-        }
-        
-        self.model = genai.GenerativeModel(
-            model_name=self.model_name,
-            generation_config=generation_config,
-            system_instruction=self.system_instruction
+        cfg = config["llm"]
+        self.client = genai.Client(api_key=api_key)
+        self.model = self._resolve_model(cfg["model"])
+        self.chat_config = types.GenerateContentConfig(
+            system_instruction=cfg["system_instruction"],
+            max_output_tokens=cfg["max_tokens"],
+            temperature=0.7,
         )
-        
-        # Start a chat session for context continuity
-        self.chat = self.model.start_chat(history=[])
-        
-        print(f"LLM Client initialized with model: {self.model_name}")
-    
+        self.reset_conversation()
+        print(f"Gemini ready ({self.model})")
+
+    def _resolve_model(self, wanted):
+        """Use the configured model, or fall back to any available Flash model.
+
+        Gemini models get retired often, so a stale name in settings.yaml
+        shouldn't stop the robot from working.
+        """
+        try:
+            self.client.models.get(model=wanted)
+            return wanted
+        except errors.ClientError as e:
+            if e.code != 404:
+                raise
+        flash = [
+            m.name.removeprefix("models/")
+            for m in self.client.models.list()
+            if "flash" in m.name
+            and "generateContent" in (m.supported_actions or [])
+            and not any(tag in m.name for tag in ("image", "tts", "live", "lite"))
+        ]
+        if not flash:
+            raise RuntimeError(f"Model '{wanted}' not found and no Flash model available")
+        # Prefer stable models, then the highest version.
+        best = max(flash, key=lambda name: ("preview" not in name and "exp" not in name, name))
+        print(f"Model '{wanted}' not found, using '{best}'")
+        return best
+
+    def reset_conversation(self):
+        self.chat = self.client.chats.create(model=self.model, config=self.chat_config)
+
     def ask(self, prompt):
-        """
-        Ask Gemini a question and get a concise response.
-        
-        Args:
-            prompt: The user's question or statement
-        
-        Returns:
-            str: Gemini's response, or error message if request fails
-        """
         if not prompt or not prompt.strip():
             return "I didn't catch that. Could you repeat?"
-        
         try:
-            # Send message and get response
-            response = self.chat.send_message(prompt)
-            
-            # Extract text from response
-            answer = response.text.strip()
-            
-            # Ensure response isn't too long (safety check)
-            if len(answer) > 500:
-                # Truncate to first 2 sentences if too long
-                sentences = answer.split('. ')
-                answer = '. '.join(sentences[:2])
-                if not answer.endswith('.'):
-                    answer += '.'
-            
-            return answer
-            
+            answer = (self.chat.send_message(prompt).text or "").strip()
+            return answer or "Sorry, I don't have an answer for that."
         except Exception as e:
-            print(f"Error calling Gemini API: {e}")
+            print(f"Gemini error: {e}")
             return "Sorry, I had trouble thinking of a response."
-    
-    def reset_conversation(self):
-        """
-        Reset the conversation history.
-        Useful if you want to start a fresh conversation.
-        """
-        self.chat = self.model.start_chat(history=[])
-        print("Conversation history reset")
-    
-    def get_conversation_history(self):
-        """
-        Get the current conversation history.
-        
-        Returns:
-            list: List of message dictionaries
-        """
-        return self.chat.history
 
-
-# Standalone function for simple usage
-def ask_gemini(prompt, api_key=None, system_instruction=None):
-    """
-    Simple standalone function to ask Gemini a question.
-    
-    This is a convenience function that doesn't require creating a client object.
-    Use this for one-off queries. For conversation context, use the LLMClient class.
-    
-    Args:
-        prompt: The question to ask
-        api_key: Gemini API key (optional, reads from env if not provided)
-        system_instruction: Custom system instruction (optional)
-    
-    Returns:
-        str: Gemini's response
-    """
-    if api_key is None:
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            return "Error: GEMINI_API_KEY not set"
-    
-    try:
-        genai.configure(api_key=api_key)
-        
-        generation_config = {
-            "max_output_tokens": 100,
-            "temperature": 0.7,
-        }
-        
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            generation_config=generation_config,
-            system_instruction=system_instruction or "Give very concise answers in 1-2 sentences."
-        )
-        
-        response = model.generate_content(prompt)
-        return response.text.strip()
-        
-    except Exception as e:
-        print(f"Error: {e}")
-        return f"Error calling Gemini API: {str(e)}"
-
-
-def main():
-    """
-    Test function for the LLM client module.
-    """
-    import sys
-    sys.path.append(str(Path(__file__).parent))
-    from utils import load_config, load_env, get_api_key
-    
-    print("LLM Client Test")
-    print("-" * 40)
-    
-    try:
-        # Load configuration and API key
-        load_env()
-        config = load_config()
-        api_key = get_api_key()
-        
-        # Create client
-        client = LLMClient(config, api_key)
-        
-        # Test questions
-        test_questions = [
-            "What is your name?",
-            "What can you do?",
-            "Tell me a fun fact about robots.",
-        ]
-        
-        print("\nTesting LLM with sample questions...\n")
-        
-        for question in test_questions:
-            print(f"Q: {question}")
-            answer = client.ask(question)
-            print(f"A: {answer}\n")
-        
-        print("Test complete!")
-        
-    except ValueError as e:
-        print(f"Configuration error: {e}")
-        print("\nPlease create a .env file with your GEMINI_API_KEY:")
-        print("  GEMINI_API_KEY=your_actual_api_key_here")
-        
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
+    def transcribe(self, wav_bytes, language="en"):
+        """Return the words spoken in a WAV clip, or '' if there were none."""
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=[
+                    f"Transcribe the speech in this audio (language: {language}). "
+                    "Reply with only the words spoken. If there is no clear speech, reply with nothing.",
+                    types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
+                ],
+                config=types.GenerateContentConfig(temperature=0),
+            )
+            return (response.text or "").strip()
+        except Exception as e:
+            print(f"Transcription error: {e}")
+            return ""
 
 
 if __name__ == "__main__":
-    main()
+    from utils import get_api_key, load_config
 
+    client = LLMClient(load_config(), get_api_key())
+    for q in ["What is your name?", "Tell me a fun fact about robots."]:
+        print(f"Q: {q}\nA: {client.ask(q)}\n")
