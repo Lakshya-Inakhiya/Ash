@@ -1,35 +1,24 @@
-# Ash Robot Configuration
+# Ash robot settings
 
-# Face Display Settings
 display:
-  framebuffer_path: "/dev/fb1"  # LCD framebuffer device
-  resolution:
-    width: 480
-    height: 320
-  faces_directory: "assets/faces"
-  # SPI LCD Configuration (for Raspberry Pi 5)
+  resolution: {width: 480, height: 320}
+  faces_directory: assets/faces
+  # 3.5" ILI9486 SPI LCD (goodtft MPI3501 / Waveshare 3.5" A)
   spi:
-    bus: 0              # SPI bus number
-    device: 0           # SPI device number
-    dc_pin: 24          # Data/Command pin (GPIO)
-    rst_pin: 25         # Reset pin (GPIO)
-    bl_pin: 18          # Backlight pin (GPIO)
-    speed_hz: 32000000  # SPI speed in Hz (32 MHz)
-    rotation: 1         # Display rotation (0-3, where 1 = 90 degrees)
+    bus: 0
+    device: 0
+    dc_pin: 24          # GPIO numbers, not header pin numbers
+    rst_pin: 25
+    bl_pin: 18
+    speed_hz: 16000000  # raise to 32000000 if your panel handles it
+    rotation: 1         # 0-3, 1 = landscape
+    register_width: 16  # 16 for MPI3501/Waveshare boards, 8 for bare ILI9486 modules
 
-# Servo/Gesture Settings
 servos:
   i2c_address: 0x40
-  pwm_frequency: 50  # Hz, standard for servos
-  channels:
-    left_arm: 0
-    right_arm: 1
-  # Pulse width values for MG995 servos (microseconds)
-  pulse_range:
-    min: 500    # 0 degrees
-    max: 2500   # 180 degrees
-    center: 1500  # 90 degrees
-  # Safe angle definitions (degrees)
+  pwm_frequency: 50
+  channels: {left_arm: 0, right_arm: 1}
+  pulse_range: {min: 500, max: 2500}  # microseconds, MG995
   angles:
     arms_up: 45
     arms_down: 135
@@ -37,24 +26,23 @@ servos:
     wave_start: 60
     wave_end: 120
     point_up: 45
-  # Movement speed (seconds for transition)
-  transition_speed: 0.3
+  transition_speed: 0.3  # seconds per move
 
-# Audio Settings
 audio:
-  timeout: 5  # seconds to wait for speech
-  phrase_time_limit: 10  # max seconds to record
-  language: "en"  # language code for TTS
-  tts_slow: false  # speak slowly if true
+  timeout: 5              # seconds to wait for you to start talking
+  phrase_time_limit: 10   # max seconds per recording
+  silence_seconds: 1.0    # stop recording after this much quiet
+  silence_threshold: 500  # minimum loudness counted as speech (auto-raised for noisy rooms)
+  language: en
+  tts_slow: false
 
-# LLM Settings
 llm:
-  model: "gemini-2.0-flash-exp"
-  system_instruction: "You are Ash, a helpful desktop robot. Give very concise answers in 1-2 sentences."
-  max_tokens: 100  # keep responses short
+  # "gemini-flash-latest" always points at Google's current Flash model.
+  # If a model you set here is retired, Ash picks another Flash model automatically.
+  model: gemini-flash-latest
+  system_instruction: "You are Ash, a helpful desktop robot. Give very concise answers in 1-2 sentences. Your replies are spoken aloud, so don't use markdown, lists or emoji."
+  max_tokens: 200
 
-# Main Loop Settings
 main:
-  cooldown_period: 3  # seconds to wait after speaking before listening again
-  startup_expression: "neutral"
-
+  cooldown_period: 1  # seconds to pause after answering
+  startup_expression: neutral
