@@ -62,5 +62,7 @@ class Brain:
             if getattr(e, "code", None) == 429:  # free-tier rate limit or daily quota
                 return Reaction("I've used up my free thinking for now. Try again in a minute, "
                                 "or add your own Gemini key below.", "error")
+            if "timeout" in type(e).__name__.lower():
+                return Reaction("I'm thinking too slowly right now. Please try again.", "error")
             return Reaction("Sorry, my brain glitched. Try again in a moment.", "error")
         return Reaction(reply, pick_face(text), pick_gesture(text))
