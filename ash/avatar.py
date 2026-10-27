@@ -79,9 +79,9 @@ def render(face="neutral", poses=()):
   <g class="right"><rect x="225" y="190" width="20" height="95" rx="10" fill="#4b596b"/>
     <circle cx="235" cy="290" r="13" fill="#5d6d82"/></g>
   <rect x="145" y="165" width="30" height="22" fill="#2b3440"/>
-  <rect x="95" y="180" width="130" height="120" rx="24" fill="#3a4656"/>
+  <rect x="95" y="180" width="130" height="120" rx="24" fill="#3a4656" stroke="#5d6d82" stroke-width="3"/>
   <circle class="light" cx="160" cy="235" r="10" fill="{GLOW}"/>
-  <rect x="60" y="20" width="200" height="150" rx="28" fill="#2b3440"/>
+  <rect x="60" y="20" width="200" height="150" rx="28" fill="#2b3440" stroke="#5d6d82" stroke-width="3"/>
   <rect x="75" y="35" width="170" height="120" rx="18" fill="#0b1320"/>
   <g class="face">{FACES.get(face, FACES["neutral"])}</g>
 </svg>
