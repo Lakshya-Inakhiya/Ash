@@ -1,6 +1,7 @@
 """Ash on the web: talk or type to a little robot that answers using Gemini."""
 
 import mimetypes
+import os
 import tempfile
 import time
 from pathlib import Path
@@ -106,4 +107,6 @@ with gr.Blocks(title="Ash") as demo:
 CSS = ".ash-avatar svg { width: 100%; max-height: 420px; }"
 
 if __name__ == "__main__":
-    demo.launch(css=CSS)
+    # Hosts like Render tell the app which port to use through $PORT.
+    port = os.getenv("PORT")
+    demo.launch(css=CSS, server_name="0.0.0.0" if port else None, server_port=int(port) if port else None)

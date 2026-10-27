@@ -2,7 +2,7 @@
 
 A little robot you can talk to. Type or speak, and Ash answers using Google Gemini, then reacts with its face and arms: it waves when you say hi, points when you ask a question, and cheers when you share good news.
 
-**Try it:** _live demo link goes here once deployed_
+**Try it:** _live demo link goes here once deployed_ (the first load can take a minute while the free server wakes up)
 
 ![Ash waving back after being greeted](docs/screenshot.png)
 
@@ -42,15 +42,13 @@ Run the tests with `venv/bin/pip install pytest && venv/bin/pytest`.
 
 ## Deploy your own copy
 
-The app runs for free on [Hugging Face Spaces](https://huggingface.co/spaces). GitHub Actions runs the tests on every push and redeploys the Space when `main` changes.
+The app runs for free on [Render](https://render.com), which redeploys it whenever `main` changes. GitHub Actions runs the tests on every push.
 
-1. Create a Space on Hugging Face (SDK: Gradio, hardware: free CPU).
-2. In the Space's **Settings → Variables and secrets**, add a secret `GEMINI_API_KEY` with your key.
-3. Create a Hugging Face access token with write permission at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
-4. In this GitHub repo's **Settings → Secrets and variables → Actions**, add a secret `HF_TOKEN` with that token and a variable `HF_SPACE` set to `your-hf-username/your-space-name`.
-5. Push to `main`. The Space updates in a minute or two.
+1. Sign up at [render.com](https://render.com) with your GitHub account.
+2. Click **New → Blueprint** and pick this repo. Render reads `render.yaml` and sets everything up.
+3. When it asks for `GEMINI_API_KEY`, paste your key, then click **Deploy**.
 
-Visitors use your key, so they don't need one. If your free quota runs out, they can paste their own key in the app.
+Visitors use your key, so they don't need one. If your free quota runs out, they can paste their own key in the app. On the free plan the app sleeps after 15 minutes without visitors, so the first visit after that takes about a minute to load.
 
 ## Project layout
 
@@ -68,4 +66,4 @@ tests/              pytest tests
 
 ## Built with
 
-Python, Gradio, Google Gemini API, edge-tts, GitHub Actions, Hugging Face Spaces. The hardware version adds a Raspberry Pi 5, an SPI LCD driver written from scratch, and PCA9685 servo control.
+Python, Gradio, Google Gemini API, edge-tts, GitHub Actions, Render. The hardware version adds a Raspberry Pi 5, an SPI LCD driver written from scratch, and PCA9685 servo control.
