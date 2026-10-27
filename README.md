@@ -2,7 +2,7 @@
 
 A little robot you can talk to. Type or speak, and Ash answers using AI (open models running on Groq), then reacts with its face and arms: it waves when you say hi, points when you ask a question, and cheers when you share good news.
 
-**Try it:** _live demo link goes here once deployed_ (the first load can take a minute while the free server wakes up)
+**Try it live: [ash-11nq.onrender.com](https://ash-11nq.onrender.com)** (the first visit can take up to a minute while the free server wakes up)
 
 ![Ash waving back after being greeted](docs/screenshot.png)
 

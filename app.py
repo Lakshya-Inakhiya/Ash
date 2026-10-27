@@ -104,8 +104,13 @@ with gr.Blocks(title="Ash") as demo:
     box.submit(respond, [box, history, user_key], [history, chat, face, speaker, box])
 
 CSS = ".ash-avatar svg { width: 100%; max-height: 420px; }"
+THEME = gr.themes.Soft(primary_hue="cyan", neutral_hue="slate")  # match Ash's glowing face
+ICON = Path(__file__).parent / "docs" / "icon.png"
 
 if __name__ == "__main__":
     # Hosts like Render tell the app which port to use through $PORT.
     port = os.getenv("PORT")
-    demo.launch(css=CSS, server_name="0.0.0.0" if port else None, server_port=int(port) if port else None)
+    demo.launch(
+        css=CSS, theme=THEME, favicon_path=ICON, footer_links=[],
+        server_name="0.0.0.0" if port else None, server_port=int(port) if port else None,
+    )
