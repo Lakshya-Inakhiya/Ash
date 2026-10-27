@@ -1,8 +1,11 @@
 """Gemini client for chat replies and speech-to-text. The free API tier is enough."""
 
+import time
+
 from google import genai
 from google.genai import errors, types
 
+TIMEOUT_SECONDS = 30
 _resolved_models = {}
 
 
@@ -45,16 +48,19 @@ def to_contents(history):
 
 class Gemini:
     def __init__(self, api_key, model="gemini-flash-latest", system_instruction=None):
-        self.client = genai.Client(api_key=api_key)
+        self.client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_SECONDS * 1000))
         if model not in _resolved_models:
             _resolved_models[model] = resolve_model(self.client, model)
+            print(f"Using Gemini model: {_resolved_models[model]}")
         self.model = _resolved_models[model]
         self.config = types.GenerateContentConfig(system_instruction=system_instruction, temperature=0.7)
 
     def reply(self, history):
+        start = time.monotonic()
         response = self.client.models.generate_content(
             model=self.model, contents=to_contents(history), config=self.config
         )
+        print(f"Gemini replied in {time.monotonic() - start:.1f}s")
         return (response.text or "").strip() or "Hmm, I don't have an answer for that."
 
     def transcribe(self, audio, mime_type="audio/wav"):

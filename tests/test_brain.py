@@ -62,3 +62,10 @@ def test_respond_shows_error_face_when_gemini_fails():
 def test_respond_explains_quota_limits():
     quota = errors.ClientError(429, {"error": {"message": "RESOURCE_EXHAUSTED"}})
     assert "own Gemini key" in Brain(FakeLLM(fail=quota)).respond("Hello").reply
+
+
+def test_respond_explains_timeouts():
+    class ReadTimeout(Exception):
+        pass
+
+    assert "too slowly" in Brain(FakeLLM(fail=ReadTimeout())).respond("Hello").reply
