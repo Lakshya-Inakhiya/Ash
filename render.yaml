@@ -1,0 +1,11 @@
+# Lets Render set up Ash from this file: Dashboard → New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: ash
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false  # Render asks you for the value; it's never stored in the repo
