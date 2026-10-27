@@ -7,7 +7,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
-      - key: GEMINI_API_KEY
+      - key: GROQ_API_KEY
         sync: false  # Render asks you for the value; it's never stored in the repo
       - key: PYTHONUNBUFFERED
         value: "1"  # show print() output in Render's logs right away

@@ -1,98 +1,89 @@
-"""Gemini client for chat replies and speech-to-text. The free API tier is enough."""
+"""AI client for chat replies and speech-to-text.
+
+Uses Groq's free API by default. Groq speaks the same API as OpenAI, so any
+OpenAI-compatible provider works by changing base_url and models in
+config/settings.yaml.
+"""
 
 import time
 
-from google import genai
-from google.genai import errors, types
+from openai import OpenAI
 
 TIMEOUT_SECONDS = 20
-# Worth trying another model for these: not found, rate-limited, overloaded or broken.
-RETRYABLE_CODES = {404, 429, 500, 503}
-_resolved_models = {}
+# Worth trying the next model for these: not found, rate-limited, or the server is struggling.
+RETRYABLE_STATUS = {404, 429, 500, 502, 503, 504}
+_available_models = {}
 
 
-def resolve_model(client, wanted):
-    """Use the configured model, or fall back to an available Flash model.
+def status_of(error):
+    return getattr(error, "status_code", None)
 
-    Gemini models get retired often, so a stale name in the settings
-    shouldn't break Ash.
+
+def is_retryable(error):
+    name = type(error).__name__.lower()
+    return status_of(error) in RETRYABLE_STATUS or "timeout" in name or "connection" in name
+
+
+def available(client, wanted):
+    """Keep the wanted models the provider still offers, in order.
+
+    Providers retire models often, so a stale name in the settings shouldn't
+    break Ash. If none are left, fall back to whatever chat model exists.
     """
     try:
-        client.models.get(model=wanted)
-        return wanted
-    except errors.ClientError as e:
-        if e.code != 404:
-            raise
-    flash = [
-        m.name.removeprefix("models/")
-        for m in client.models.list()
-        if "flash" in m.name
-        and "generateContent" in (m.supported_actions or [])
-        and not any(tag in m.name for tag in ("image", "tts", "live", "lite"))
-    ]
-    if not flash:
-        raise RuntimeError(f"Model '{wanted}' not found and no Flash model available")
-    # Prefer stable models, then the highest version.
-    best = max(flash, key=lambda name: ("preview" not in name and "exp" not in name, name))
-    print(f"Model '{wanted}' not found, using '{best}'")
-    return best
+        offered = {m.id for m in client.models.list()}
+    except Exception as e:
+        print(f"Couldn't list models ({e!r}); trying the configured ones anyway.")
+        return list(wanted)
+    models = [m for m in wanted if m in offered]
+    if not models:
+        chat = sorted(m for m in offered if not any(tag in m for tag in ("whisper", "guard", "tts", "embed")))
+        models = chat[-1:]
+        print(f"None of {wanted} are available, using {models}")
+    return models
 
 
-def to_contents(history):
-    return [
-        types.Content(
-            role="model" if message["role"] == "assistant" else "user",
-            parts=[types.Part.from_text(text=message["content"])],
-        )
-        for message in history
-    ]
+class LLM:
+    def __init__(self, api_key, base_url, models, speech_models=(), system_instruction=None):
+        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=TIMEOUT_SECONDS, max_retries=0)
+        key = (base_url, tuple(models))
+        if key not in _available_models:
+            _available_models[key] = available(self.client, models)
+            print(f"Chat models: {_available_models[key]}")
+        self.models = _available_models[key]
+        self.speech_models = list(speech_models)
+        self.system_instruction = system_instruction
 
-
-class Gemini:
-    def __init__(self, api_key, model="gemini-flash-latest", system_instruction=None, backup_models=()):
-        self.client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_SECONDS * 1000))
-        if model not in _resolved_models:
-            _resolved_models[model] = resolve_model(self.client, model)
-            print(f"Using Gemini model: {_resolved_models[model]}")
-        self.model = _resolved_models[model]
-        self.backup_models = [m for m in backup_models if m != self.model]
-        self.config = types.GenerateContentConfig(system_instruction=system_instruction, temperature=0.7)
-
-    def _generate(self, contents, config):
-        """Call Gemini, moving on to a backup model if one is overloaded, out of quota or too slow.
-
-        Each model has its own capacity and free-tier limits, so a backup often
-        works when the main model doesn't.
-        """
-        models = [self.model, *self.backup_models]
+    def _try_models(self, models, call):
+        """Run call(model) on each model in turn until one works."""
         for i, model in enumerate(models):
             start = time.monotonic()
             try:
-                response = self.client.models.generate_content(model=model, contents=contents, config=config)
-                print(f"Gemini ({model}) replied in {time.monotonic() - start:.1f}s")
-                return response
+                result = call(model)
+                print(f"{model} answered in {time.monotonic() - start:.1f}s")
+                return result
             except Exception as e:
-                retryable = getattr(e, "code", None) in RETRYABLE_CODES or "timeout" in type(e).__name__.lower()
-                if not retryable or i == len(models) - 1:
+                if not is_retryable(e) or i == len(models) - 1:
                     raise
-                print(f"Gemini ({model}) failed after {time.monotonic() - start:.1f}s: {e!r}. Trying a backup model.")
+                print(f"{model} failed after {time.monotonic() - start:.1f}s ({e!r}); trying the next model.")
 
     def reply(self, history):
-        response = self._generate(to_contents(history), self.config)
-        return (response.text or "").strip() or "Hmm, I don't have an answer for that."
+        """history: messages as {"role": "user" | "assistant", "content": str}."""
+        messages = [{"role": "system", "content": self.system_instruction}, *history]
+        response = self._try_models(
+            self.models,
+            lambda model: self.client.chat.completions.create(model=model, messages=messages, temperature=0.7),
+        )
+        return (response.choices[0].message.content or "").strip() or "Hmm, I don't have an answer for that."
 
-    def transcribe(self, audio, mime_type="audio/wav"):
+    def transcribe(self, audio, filename="speech.wav"):
         """Return the words spoken in an audio clip, or '' if there were none."""
         try:
-            response = self._generate(
-                [
-                    "Transcribe the speech in this audio. Reply with only the words spoken. "
-                    "If there is no clear speech, reply with nothing.",
-                    types.Part.from_bytes(data=audio, mime_type=mime_type),
-                ],
-                types.GenerateContentConfig(temperature=0),
+            result = self._try_models(
+                self.speech_models,
+                lambda model: self.client.audio.transcriptions.create(model=model, file=(filename, audio)),
             )
-            return (response.text or "").strip()
+            return (result.text or "").strip()
         except Exception as e:
-            print(f"Transcription error: {e}")
+            print(f"Transcription error: {e!r}")
             return ""

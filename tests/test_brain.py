@@ -1,5 +1,4 @@
 import pytest
-from google.genai import errors
 
 from ash.brain import Brain, gesture_poses, pick_face, pick_gesture
 from ash.config import load_config
@@ -52,16 +51,20 @@ def test_respond_sends_history_and_picks_reaction():
     assert llm.seen == [*earlier, {"role": "user", "content": "Hello again"}]
 
 
-def test_respond_shows_error_face_when_gemini_fails():
+def test_respond_shows_error_face_when_the_ai_fails():
     reaction = Brain(FakeLLM(fail=RuntimeError("boom"))).respond("Hello")
     assert reaction.face == "error"
     assert reaction.gesture is None
     assert "glitched" in reaction.reply
 
 
+class APIError(Exception):
+    def __init__(self, status_code):
+        self.status_code = status_code
+
+
 def test_respond_explains_quota_limits():
-    quota = errors.ClientError(429, {"error": {"message": "RESOURCE_EXHAUSTED"}})
-    assert "own Gemini key" in Brain(FakeLLM(fail=quota)).respond("Hello").reply
+    assert "own Groq key" in Brain(FakeLLM(fail=APIError(429))).respond("Hello").reply
 
 
 def test_respond_explains_busy_servers():
@@ -69,5 +72,4 @@ def test_respond_explains_busy_servers():
         pass
 
     assert "busy" in Brain(FakeLLM(fail=ReadTimeout())).respond("Hello").reply
-    overloaded = errors.ServerError(503, {"error": {"message": "high demand"}})
-    assert "busy" in Brain(FakeLLM(fail=overloaded)).respond("Hello").reply
+    assert "busy" in Brain(FakeLLM(fail=APIError(504))).respond("Hello").reply
