@@ -58,6 +58,9 @@ class Brain:
         try:
             reply = self.llm.reply([*history, {"role": "user", "content": text}])
         except Exception as e:
-            print(f"Gemini error: {e}")
+            print(f"Gemini error: {e!r}")
+            if getattr(e, "code", None) == 429:  # free-tier rate limit or daily quota
+                return Reaction("I've used up my free thinking for now. Try again in a minute, "
+                                "or add your own Gemini key below.", "error")
             return Reaction("Sorry, my brain glitched. Try again in a moment.", "error")
         return Reaction(reply, pick_face(text), pick_gesture(text))
