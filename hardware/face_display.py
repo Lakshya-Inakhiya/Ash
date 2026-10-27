@@ -6,9 +6,8 @@ from pathlib import Path
 import pygame
 from PIL import Image
 
-from utils import PROJECT_ROOT
-
-EXPRESSIONS = ["happy", "sad", "neutral", "listening", "speaking", "thinking", "error"]
+from ash.brain import FACES
+from ash.config import ROOT
 
 
 class FaceDisplay:
@@ -21,7 +20,7 @@ class FaceDisplay:
 
         if Path("/proc/device-tree/model").exists():
             try:
-                from lcd_spi_driver import ILI9486SPI
+                from hardware.lcd_spi_driver import ILI9486SPI
                 self.lcd = ILI9486SPI(*self.size, **cfg.get("spi", {}))
                 print("LCD ready (SPI)")
             except Exception as e:
@@ -34,9 +33,9 @@ class FaceDisplay:
             except pygame.error as e:
                 print(f"No display available ({e}); faces will only be logged.")
 
-        faces_dir = PROJECT_ROOT / cfg["faces_directory"]
+        faces_dir = ROOT / cfg["faces_directory"]
         self.faces = {}
-        for name in EXPRESSIONS:
+        for name in FACES:
             path = faces_dir / f"{name}.png"
             if path.exists():
                 self.faces[name] = Image.open(path).convert("RGB").resize(self.size, Image.Resampling.LANCZOS)
@@ -78,9 +77,9 @@ class FaceDisplay:
 
 
 if __name__ == "__main__":
-    from utils import load_config
+    from ash.config import load_config
 
-    display = FaceDisplay(load_config())
+    display = FaceDisplay(load_config("hardware/settings.yaml"))
     for name in display.faces:
         print(name)
         display.set_expression(name)
