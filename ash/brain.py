@@ -58,11 +58,12 @@ class Brain:
         try:
             reply = self.llm.reply([*history, {"role": "user", "content": text}])
         except Exception as e:
-            print(f"Gemini error: {e!r}")
-            if getattr(e, "code", None) == 429:  # free-tier rate limit or daily quota
+            print(f"AI error: {e!r}")
+            status = getattr(e, "status_code", None)
+            if status == 429:  # free-tier rate limit or daily quota
                 return Reaction("I've used up my free thinking for now. Try again in a minute, "
-                                "or add your own Gemini key below.", "error")
-            if getattr(e, "code", None) == 503 or "timeout" in type(e).__name__.lower():
-                return Reaction("Google's AI servers are busy right now. Please try again in a moment.", "error")
+                                "or add your own Groq key below.", "error")
+            if status in (500, 502, 503, 504) or "timeout" in type(e).__name__.lower():
+                return Reaction("My AI servers are busy right now. Please try again in a moment.", "error")
             return Reaction("Sorry, my brain glitched. Try again in a moment.", "error")
         return Reaction(reply, pick_face(text), pick_gesture(text))

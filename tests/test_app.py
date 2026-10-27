@@ -10,14 +10,14 @@ def test_asks_for_a_key_when_none_is_set(monkeypatch):
 
 
 def test_full_reply(monkeypatch):
-    class FakeGemini:
+    class FakeLLM:
         def __init__(self, key, **settings):
             pass
 
         def reply(self, history):
             return "Hello, human!"
 
-    monkeypatch.setattr(app, "Gemini", FakeGemini)
+    monkeypatch.setattr(app, "LLM", FakeLLM)
     monkeypatch.setattr(app, "save_voice", lambda text: None)
     updates = list(app.respond({"text": "Hi Ash"}, [], "my-key"))
     assert "Ash looking thinking" in updates[0][2]

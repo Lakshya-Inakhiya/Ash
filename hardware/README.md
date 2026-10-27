@@ -21,7 +21,7 @@ Left arm on channel 0, right arm on channel 1. Never power the servos from the P
 ## Running
 
 ```bash
-./hardware/setup.sh            # installs everything and asks for your Gemini key
+./hardware/setup.sh            # installs everything and asks for your Groq key
 sudo reboot
 venv/bin/python -m hardware.main
 ```

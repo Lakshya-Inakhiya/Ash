@@ -1,6 +1,5 @@
-"""Ash on the web: talk or type to a little robot that answers using Gemini."""
+"""Ash on the web: talk or type to a little robot that answers using AI."""
 
-import mimetypes
 import os
 import tempfile
 import time
@@ -11,7 +10,7 @@ import gradio as gr
 from ash import avatar, voice
 from ash.brain import Brain, gesture_poses
 from ash.config import api_key, load_config
-from ash.llm import Gemini
+from ash.llm import LLM
 
 CONFIG = load_config()
 MAX_INPUT_CHARS = 500
@@ -47,19 +46,19 @@ def respond(message, history, user_key):
 
     key = (user_key or "").strip() or api_key()
     if not key:
-        yield from say("I need a Gemini API key to think. Add one under 'Use your own Gemini key'.", "error")
+        yield from say("I need a Groq API key to think. Add one under 'Use your own Groq key'.", "error")
         return
     try:
-        brain = Brain(Gemini(key, **CONFIG["llm"]))
+        brain = Brain(LLM(key, **CONFIG["llm"]))
     except Exception as e:
-        print(f"Gemini setup failed: {e}")
-        yield from say("That Gemini API key didn't work. Check it and try again.", "error")
+        print(f"AI setup failed: {e!r}")
+        yield from say("That Groq API key didn't work. Check it and try again.", "error")
         return
 
     if recordings and not text:
         yield history, history, avatar.render("listening"), None, box
         path = recordings[-1]
-        text = brain.llm.transcribe(Path(path).read_bytes(), mimetypes.guess_type(path)[0] or "audio/wav")
+        text = brain.llm.transcribe(Path(path).read_bytes(), Path(path).name)
         if not text:
             yield from say("I didn't catch that. Could you try again?", "neutral")
             return
@@ -79,7 +78,7 @@ def respond(message, history, user_key):
 with gr.Blocks(title="Ash") as demo:
     gr.Markdown(
         "# Ash\nA little robot you can talk to. Type, or press the mic and speak. "
-        "Ash answers with Gemini and reacts with its face and arms. "
+        "Ash answers using AI and reacts with its face and arms. "
         "[Source on GitHub](https://github.com/Lakshya-Inakhiya/Ash)"
     )
     history = gr.State([])
@@ -96,10 +95,10 @@ with gr.Blocks(title="Ash") as demo:
                 [{"text": "Hi Ash!"}, {"text": "Explain black holes like I'm five"}, {"text": "I passed my exam!"}],
                 inputs=box,
             )
-    with gr.Accordion("Use your own Gemini key", open=False):
+    with gr.Accordion("Use your own Groq key", open=False):
         user_key = gr.Textbox(
             type="password", show_label=False,
-            placeholder="Optional. Get a free key at aistudio.google.com/apikey. It's only used for your messages.",
+            placeholder="Optional. Get a free key at console.groq.com/keys. It's only used for your messages.",
         )
 
     box.submit(respond, [box, history, user_key], [history, chat, face, speaker, box])

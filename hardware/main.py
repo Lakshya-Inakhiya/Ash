@@ -10,7 +10,7 @@ import time
 
 from ash.brain import GESTURES, Brain
 from ash.config import api_key, load_config
-from ash.llm import Gemini
+from ash.llm import LLM
 from hardware.audio_io import AudioIO
 from hardware.face_display import FaceDisplay
 from hardware.gestures import ServoController
@@ -23,13 +23,13 @@ class Robot:
         brain_config, config = load_config(), load_config("hardware/settings.yaml")
         key = api_key()
         if not key:
-            sys.exit("GEMINI_API_KEY not set. Copy .env.example to .env and add your key.")
-        gemini = Gemini(key, **brain_config["llm"])
-        self.brain = Brain(gemini)
+            sys.exit("GROQ_API_KEY not set. Copy .env.example to .env and add your key.")
+        llm = LLM(key, **brain_config["llm"])
+        self.brain = Brain(llm)
         self.history = []
         self.display = FaceDisplay(config)
         self.arms = ServoController(config["servos"], brain_config["gestures"])
-        self.audio = AudioIO(config["audio"], brain_config["voice"], gemini.transcribe)
+        self.audio = AudioIO(config["audio"], brain_config["voice"], llm.transcribe)
         self.use_voice = self.audio.microphone_available and not text_mode
         self.cooldown = config["cooldown_period"]
 

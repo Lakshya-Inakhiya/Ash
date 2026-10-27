@@ -15,7 +15,7 @@ def load_config(path="config/settings.yaml"):
 
 
 def api_key():
-    """The Gemini key from .env (local) or the environment (e.g. a secret set on Render)."""
+    """The Groq key from .env (local) or the environment (e.g. a secret set on Render)."""
     load_dotenv(ROOT / ".env")
-    key = os.getenv("GEMINI_API_KEY", "").strip()
+    key = os.getenv("GROQ_API_KEY", "").strip()
     return key if key and key != "your_api_key_here" else None

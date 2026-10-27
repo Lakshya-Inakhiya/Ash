@@ -20,10 +20,10 @@ venv/bin/pip install --upgrade pip
 venv/bin/pip install -r hardware/requirements.txt
 
 if [ ! -f .env ]; then
-    read -rsp "Gemini API key (from https://aistudio.google.com/apikey, blank to skip): " key
+    read -rsp "Groq API key (from https://console.groq.com/keys, blank to skip): " key
     echo
     if [ -n "$key" ]; then
-        (umask 077 && echo "GEMINI_API_KEY=$key" > .env)
+        (umask 077 && echo "GROQ_API_KEY=$key" > .env)
     else
         cp .env.example .env && chmod 600 .env
         echo "Edit .env and add your key before running Ash."

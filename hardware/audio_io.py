@@ -20,7 +20,7 @@ BLOCK_SECONDS = 0.1
 
 class AudioIO:
     def __init__(self, cfg, voice, transcriber=None):
-        """transcriber: callable(wav_bytes) -> str, e.g. Gemini.transcribe."""
+        """transcriber: callable(wav_bytes) -> str, e.g. LLM.transcribe."""
         self.timeout = cfg["timeout"]
         self.phrase_time_limit = cfg["phrase_time_limit"]
         self.silence_seconds = cfg.get("silence_seconds", 1.0)
@@ -122,11 +122,11 @@ def _to_wav(samples):
 
 if __name__ == "__main__":
     from ash.config import api_key, load_config
-    from ash.llm import Gemini
+    from ash.llm import LLM
 
     brain_config = load_config()
-    gemini = Gemini(api_key(), **brain_config["llm"])
-    audio = AudioIO(load_config("hardware/settings.yaml")["audio"], brain_config["voice"], gemini.transcribe)
+    llm = LLM(api_key(), **brain_config["llm"])
+    audio = AudioIO(load_config("hardware/settings.yaml")["audio"], brain_config["voice"], llm.transcribe)
     audio.speak("Hello! Say something and I will repeat it.")
     heard = audio.listen()
     audio.speak(f"You said: {heard}" if heard else "I didn't hear anything.")

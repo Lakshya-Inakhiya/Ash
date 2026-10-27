@@ -1,6 +1,6 @@
 # Ash
 
-A little robot you can talk to. Type or speak, and Ash answers using Google Gemini, then reacts with its face and arms: it waves when you say hi, points when you ask a question, and cheers when you share good news.
+A little robot you can talk to. Type or speak, and Ash answers using AI (open models running on Groq), then reacts with its face and arms: it waves when you say hi, points when you ask a question, and cheers when you share good news.
 
 **Try it:** _live demo link goes here once deployed_ (the first load can take a minute while the free server wakes up)
 
@@ -12,20 +12,21 @@ Ash started as a physical robot on a Raspberry Pi, with an LCD face and servo mo
 
 ```
  you ──► speech-to-text ──► Brain ──► reply + face + gesture ──► Body
-        (Gemini)            (ash/brain.py)                       ├─ web avatar (app.py)
+        (Whisper)           (ash/brain.py)                       ├─ web avatar (app.py)
                                                                  └─ Raspberry Pi robot (hardware/)
 ```
 
-- **Brain** (`ash/brain.py`) sends the conversation to Gemini and decides how Ash should react: which face to show and which gesture to make. It knows nothing about screens or motors.
+- **Brain** (`ash/brain.py`) sends the conversation to an AI model and decides how Ash should react: which face to show and which gesture to make. It knows nothing about screens or motors.
 - **Bodies** turn that reaction into something you can see. The web body draws Ash as an animated SVG. The hardware body shows images on an LCD and moves real servos. Gestures are defined once, as servo angles, and both bodies play them.
-- **Speech:** Gemini transcribes your voice, and Ash replies using Microsoft Edge's free text-to-speech voices.
-- **Model fallback:** Google retires Gemini models often. If the configured model disappears, Ash picks the newest stable Flash model instead of crashing.
+- **Speech:** Whisper transcribes your voice, and Ash replies using Microsoft Edge's free text-to-speech voices.
+- **Model fallback:** the settings list several models in order. If one is busy, rate-limited or retired, Ash moves on to the next instead of crashing.
+- **Any provider:** Ash uses the standard OpenAI client pointed at [Groq](https://groq.com)'s free API. Switching to another OpenAI-compatible provider means changing `base_url` and `models` in `config/settings.yaml`.
 
 ![Ash's seven faces](docs/faces.png)
 
 ## Run it locally
 
-You need Python 3.10+ and a free Gemini API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
+You need Python 3.10+ and a free Groq API key from [console.groq.com/keys](https://console.groq.com/keys) (no card needed).
 
 ```bash
 git clone https://github.com/Lakshya-Inakhiya/Ash.git
@@ -46,7 +47,7 @@ The app runs for free on [Render](https://render.com), which redeploys it whenev
 
 1. Sign up at [render.com](https://render.com) with your GitHub account.
 2. Click **New → Blueprint** and pick this repo. Render reads `render.yaml` and sets everything up.
-3. When it asks for `GEMINI_API_KEY`, paste your key, then click **Deploy**.
+3. When it asks for `GROQ_API_KEY`, paste your key, then click **Deploy**.
 
 Visitors use your key, so they don't need one. If your free quota runs out, they can paste their own key in the app. On the free plan the app sleeps after 15 minutes without visitors, so the first visit after that takes about a minute to load.
 
@@ -56,14 +57,14 @@ Visitors use your key, so they don't need one. If your free quota runs out, they
 app.py              web app (Gradio)
 ash/
   brain.py          decides what to say, which face to show, how to move
-  llm.py            Gemini client: replies, speech-to-text, model fallback
+  llm.py            AI client: replies, speech-to-text, model fallback
   avatar.py         draws Ash as an animated SVG
   voice.py          text-to-speech
-config/settings.yaml   Gemini model, personality, voice, gesture angles
+config/settings.yaml   AI provider and models, personality, voice, gesture angles
 hardware/           the original Raspberry Pi robot (see hardware/README.md)
 tests/              pytest tests
 ```
 
 ## Built with
 
-Python, Gradio, Google Gemini API, edge-tts, GitHub Actions, Render. The hardware version adds a Raspberry Pi 5, an SPI LCD driver written from scratch, and PCA9685 servo control.
+Python, Gradio, Groq (OpenAI-compatible API), Whisper, edge-tts, GitHub Actions, Render. The hardware version adds a Raspberry Pi 5, an SPI LCD driver written from scratch, and PCA9685 servo control.
