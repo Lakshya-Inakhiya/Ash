@@ -1,4 +1,5 @@
 import pytest
+from google.genai import errors
 
 from ash.brain import Brain, gesture_poses, pick_face, pick_gesture
 from ash.config import load_config
@@ -32,13 +33,13 @@ def test_gesture_poses():
 
 
 class FakeLLM:
-    def __init__(self, fail=False):
+    def __init__(self, fail=None):
         self.fail = fail
         self.seen = None
 
     def reply(self, history):
         if self.fail:
-            raise RuntimeError("quota exceeded")
+            raise self.fail
         self.seen = history
         return "Hi there!"
 
@@ -52,6 +53,12 @@ def test_respond_sends_history_and_picks_reaction():
 
 
 def test_respond_shows_error_face_when_gemini_fails():
-    reaction = Brain(FakeLLM(fail=True)).respond("Hello")
+    reaction = Brain(FakeLLM(fail=RuntimeError("boom"))).respond("Hello")
     assert reaction.face == "error"
     assert reaction.gesture is None
+    assert "glitched" in reaction.reply
+
+
+def test_respond_explains_quota_limits():
+    quota = errors.ClientError(429, {"error": {"message": "RESOURCE_EXHAUSTED"}})
+    assert "own Gemini key" in Brain(FakeLLM(fail=quota)).respond("Hello").reply
