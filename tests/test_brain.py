@@ -64,8 +64,10 @@ def test_respond_explains_quota_limits():
     assert "own Gemini key" in Brain(FakeLLM(fail=quota)).respond("Hello").reply
 
 
-def test_respond_explains_timeouts():
+def test_respond_explains_busy_servers():
     class ReadTimeout(Exception):
         pass
 
-    assert "too slowly" in Brain(FakeLLM(fail=ReadTimeout())).respond("Hello").reply
+    assert "busy" in Brain(FakeLLM(fail=ReadTimeout())).respond("Hello").reply
+    overloaded = errors.ServerError(503, {"error": {"message": "high demand"}})
+    assert "busy" in Brain(FakeLLM(fail=overloaded)).respond("Hello").reply
