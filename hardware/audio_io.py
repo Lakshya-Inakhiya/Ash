@@ -6,7 +6,8 @@ import wave
 
 import numpy as np
 import pygame
-from gtts import gTTS
+
+from ash.voice import synthesize
 
 try:
     import sounddevice as sd
@@ -18,14 +19,12 @@ BLOCK_SECONDS = 0.1
 
 
 class AudioIO:
-    def __init__(self, config, transcriber=None):
-        """transcriber: callable(wav_bytes, language) -> str, e.g. LLMClient.transcribe."""
-        cfg = config["audio"]
+    def __init__(self, cfg, voice, transcriber=None):
+        """transcriber: callable(wav_bytes) -> str, e.g. Gemini.transcribe."""
         self.timeout = cfg["timeout"]
         self.phrase_time_limit = cfg["phrase_time_limit"]
         self.silence_seconds = cfg.get("silence_seconds", 1.0)
-        self.language = cfg["language"]
-        self.tts_slow = cfg["tts_slow"]
+        self.voice = voice
         self.transcriber = transcriber
 
         pygame.mixer.init()
@@ -81,7 +80,7 @@ class AudioIO:
         if samples is None:
             return ""
         print("Processing speech...")
-        text = self.transcriber(_to_wav(samples), self.language)
+        text = self.transcriber(_to_wav(samples))
         if text:
             print(f"Heard: {text}")
         return text
@@ -90,11 +89,11 @@ class AudioIO:
         if not text or not text.strip():
             return False
         print(f"Ash: {text}")
+        mp3 = synthesize(text, self.voice)
+        if not mp3:
+            return False
         try:
-            mp3 = io.BytesIO()
-            gTTS(text=text, lang=self.language, slow=self.tts_slow).write_to_fp(mp3)
-            mp3.seek(0)
-            pygame.mixer.music.load(mp3, "mp3")
+            pygame.mixer.music.load(io.BytesIO(mp3), "mp3")
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
                 time.sleep(0.1)
@@ -122,11 +121,12 @@ def _to_wav(samples):
 
 
 if __name__ == "__main__":
-    from llm_client import LLMClient
-    from utils import get_api_key, load_config
+    from ash.config import api_key, load_config
+    from ash.llm import Gemini
 
-    config = load_config()
-    audio = AudioIO(config, LLMClient(config, get_api_key()).transcribe)
+    brain_config = load_config()
+    gemini = Gemini(api_key(), **brain_config["llm"])
+    audio = AudioIO(load_config("hardware/settings.yaml")["audio"], brain_config["voice"], gemini.transcribe)
     audio.speak("Hello! Say something and I will repeat it.")
     heard = audio.listen()
     audio.speak(f"You said: {heard}" if heard else "I didn't hear anything.")

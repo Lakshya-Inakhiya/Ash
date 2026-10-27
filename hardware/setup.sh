@@ -1,7 +1,7 @@
 #!/bin/bash
 # Set up Ash on Raspberry Pi OS (Bookworm or newer). Safe to re-run.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."  # repo root
 
 echo "Installing system packages..."
 sudo apt-get update
@@ -17,7 +17,7 @@ fi
 echo "Creating virtual environment..."
 python3 -m venv venv
 venv/bin/pip install --upgrade pip
-venv/bin/pip install -r requirements.txt
+venv/bin/pip install -r hardware/requirements.txt
 
 if [ ! -f .env ]; then
     read -rsp "Gemini API key (from https://aistudio.google.com/apikey, blank to skip): " key
@@ -32,4 +32,4 @@ fi
 
 echo
 echo "Done. If this is the first run, reboot so I2C/SPI and group changes apply."
-echo "Then start Ash with: venv/bin/python src/main.py"
+echo "Then start Ash with: venv/bin/python -m hardware.main"

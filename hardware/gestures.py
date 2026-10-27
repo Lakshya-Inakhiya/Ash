@@ -1,4 +1,4 @@
-"""Arm gestures via a PCA9685 servo board. Falls back to logging without hardware."""
+"""Arm servos via a PCA9685 board. Falls back to logging without hardware."""
 
 import time
 
@@ -9,13 +9,15 @@ try:
 except (ImportError, NotImplementedError, RuntimeError):
     board = None
 
+from ash.brain import GESTURES, gesture_poses
+
 
 class ServoController:
-    def __init__(self, config):
-        cfg = config["servos"]
-        self.angles = cfg["angles"]
+    def __init__(self, cfg, angles):
+        """cfg: the `servos` section of hardware/settings.yaml. angles: brain gesture angles."""
+        self.angles = angles
         self.speed = cfg["transition_speed"]
-        self.position = {"left": 90, "right": 90}
+        self.position = {"left": angles["neutral"], "right": angles["neutral"]}
         self.servos = {}
         self.pca = None
 
@@ -47,28 +49,16 @@ class ServoController:
                 time.sleep(self.speed / steps)
         self.position[arm] = target
 
-    def both(self, left, right):
-        self.move("left", left)
-        self.move("right", right)
-
     def neutral(self):
-        self.both(self.angles["neutral"], self.angles["neutral"])
-
-    def arms_up(self):
-        self.both(self.angles["arms_up"], self.angles["arms_up"])
-
-    def arms_down(self):
-        self.both(self.angles["arms_down"], self.angles["arms_down"])
-
-    def point(self):
-        self.both(self.angles["arms_down"], self.angles["point_up"])
-
-    def wave(self, repetitions=3):
-        self.move("right", self.angles["neutral"])
-        for _ in range(repetitions):
-            self.move("left", self.angles["wave_start"])
-            self.move("left", self.angles["wave_end"])
         self.move("left", self.angles["neutral"])
+        self.move("right", self.angles["neutral"])
+
+    def perform(self, gesture):
+        """Play a gesture from the brain, then return to neutral."""
+        for left, right in gesture_poses(gesture, self.angles):
+            self.move("left", self.angles["neutral"] if left is None else left)
+            self.move("right", self.angles["neutral"] if right is None else right)
+        self.neutral()
 
     def close(self):
         self.neutral()
@@ -77,11 +67,11 @@ class ServoController:
 
 
 if __name__ == "__main__":
-    from utils import load_config
+    from ash.config import load_config
 
-    arms = ServoController(load_config())
-    for name in ["neutral", "arms_up", "arms_down", "point", "wave", "neutral"]:
+    arms = ServoController(load_config("hardware/settings.yaml")["servos"], load_config()["gestures"])
+    for name in GESTURES:
         print(name)
-        getattr(arms, name)()
+        arms.perform(name)
         time.sleep(1)
     arms.close()

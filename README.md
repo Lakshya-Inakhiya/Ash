@@ -1,92 +1,71 @@
 # Ash
 
-A desktop robot built on a Raspberry Pi 5. You talk to it, it answers using Google Gemini, shows a face on a 3.5" LCD, and moves two servo arms.
+A little robot you can talk to. Type or speak, and Ash answers using Google Gemini, then reacts with its face and arms: it waves when you say hi, points when you ask a question, and cheers when you share good news.
 
-Everything also runs on a laptop: the face appears in a window and gestures are just logged, so you can work on it without the hardware.
+**Try it:** _live demo link goes here once deployed_
 
-## Hardware
+![Ash waving back after being greeted](docs/screenshot.png)
 
-- Raspberry Pi 5 (a Pi 4 works too)
-- 3.5" ILI9486 SPI LCD, 480×320 (goodtft MPI3501 or Waveshare 3.5" A)
-- PCA9685 16-channel servo board and two MG995 servos
-- 5V power supply for the servos, at least 3A
-- USB microphone and a speaker
+Ash started as a physical robot on a Raspberry Pi, with an LCD face and servo motor arms. I later redesigned it so the same brain can drive either that robot or an animated web version that anyone can try in a browser.
 
-### Wiring
+## How it works
 
-The LCD plugs straight onto header pins 1–26. It uses SPI0 plus GPIO 24 (DC), 25 (reset) and 18 (backlight).
+```
+ you ──► speech-to-text ──► Brain ──► reply + face + gesture ──► Body
+        (Gemini)            (ash/brain.py)                       ├─ web avatar (app.py)
+                                                                 └─ Raspberry Pi robot (hardware/)
+```
 
-| PCA9685 | Raspberry Pi |
-|---|---|
-| VCC | Pin 1 (3.3V) |
-| GND | Pin 6 (GND) |
-| SDA | Pin 3 (GPIO 2) |
-| SCL | Pin 5 (GPIO 3) |
-| V+ | Servo supply 5V |
+- **Brain** (`ash/brain.py`) sends the conversation to Gemini and decides how Ash should react: which face to show and which gesture to make. It knows nothing about screens or motors.
+- **Bodies** turn that reaction into something you can see. The web body draws Ash as an animated SVG. The hardware body shows images on an LCD and moves real servos. Gestures are defined once, as servo angles, and both bodies play them.
+- **Speech:** Gemini transcribes your voice, and Ash replies using Microsoft Edge's free text-to-speech voices.
+- **Model fallback:** Google retires Gemini models often. If the configured model disappears, Ash picks the newest stable Flash model instead of crashing.
 
-Plug the left arm servo into channel 0 and the right arm into channel 1.
+![Ash's seven faces](docs/faces.png)
 
-Two rules so you don't damage anything:
+## Run it locally
 
-- **Never power the servos from the Pi's 5V pins.** MG995s can pull over 1A each.
-- **Connect the servo supply's ground to the Pi's ground** as well as to the PCA9685. Without a shared ground the servos jitter or don't move at all.
-
-You don't need the old `LCD-show` driver. It doesn't work on the Pi 5, and Ash drives the screen directly over SPI.
-
-## Setup
+You need Python 3.10+ and a free Gemini API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 
 ```bash
 git clone https://github.com/Lakshya-Inakhiya/Ash.git
 cd Ash
-./setup.sh
-sudo reboot
+python -m venv venv
+venv/bin/pip install -r requirements.txt     # on Windows: venv\Scripts\pip
+cp .env.example .env                         # then paste your key into .env
+venv/bin/python app.py
 ```
 
-`setup.sh` installs system packages, turns on I2C and SPI, creates a virtual environment, and asks for your Gemini API key. You can get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). The key is saved to `.env`, which git ignores.
+Open http://127.0.0.1:7860 and say hi.
 
-On a Mac or PC, skip the script:
+Run the tests with `venv/bin/pip install pytest && venv/bin/pytest`.
 
-```bash
-python3 -m venv venv
-venv/bin/pip install -r requirements.txt
-cp .env.example .env   # then add your key
+## Deploy your own copy
+
+The app runs for free on [Hugging Face Spaces](https://huggingface.co/spaces). GitHub Actions runs the tests on every push and redeploys the Space when `main` changes.
+
+1. Create a Space on Hugging Face (SDK: Gradio, hardware: free CPU).
+2. In the Space's **Settings → Variables and secrets**, add a secret `GEMINI_API_KEY` with your key.
+3. Create a Hugging Face access token with write permission at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
+4. In this GitHub repo's **Settings → Secrets and variables → Actions**, add a secret `HF_TOKEN` with that token and a variable `HF_SPACE` set to `your-hf-username/your-space-name`.
+5. Push to `main`. The Space updates in a minute or two.
+
+Visitors use your key, so they don't need one. If your free quota runs out, they can paste their own key in the app.
+
+## Project layout
+
+```
+app.py              web app (Gradio)
+ash/
+  brain.py          decides what to say, which face to show, how to move
+  llm.py            Gemini client: replies, speech-to-text, model fallback
+  avatar.py         draws Ash as an animated SVG
+  voice.py          text-to-speech
+config/settings.yaml   Gemini model, personality, voice, gesture angles
+hardware/           the original Raspberry Pi robot (see hardware/README.md)
+tests/              pytest tests
 ```
 
-## Running
+## Built with
 
-```bash
-venv/bin/python src/main.py          # talk to it
-venv/bin/python src/main.py --text   # type instead
-```
-
-Ash records until you stop talking, sends the audio to Gemini for transcription, then speaks the reply. Say or type `demo` to see every gesture, `text` or `voice` to switch input, and `quit` to exit.
-
-Each module can also run on its own, which helps when you're checking hardware one piece at a time:
-
-```bash
-venv/bin/python src/lcd_spi_driver.py   # flashes red, green, blue, white
-venv/bin/python src/face_display.py     # cycles through the faces
-venv/bin/python src/gestures.py         # runs every arm gesture
-venv/bin/python src/audio_io.py         # speaks, listens, repeats what you said
-venv/bin/python src/llm_client.py       # asks Gemini two questions
-```
-
-## Configuration
-
-Settings are in `config/settings.yaml`: pins, servo angles, audio thresholds and the Gemini model. Faces are PNGs in `assets/faces/` (`happy`, `sad`, `neutral`, `listening`, `speaking`, `thinking`, `error`). Any size works, since they're scaled to 480×320.
-
-## Troubleshooting
-
-**Screen stays white or shows noise.** Check that SPI is on with `ls /dev/spidev0.0`. If you have a bare ILI9486 module rather than an MPI3501 or Waveshare board, set `register_width: 8`. If the image is garbled, lower `speed_hz`.
-
-**Servos don't move.** Run `i2cdetect -y 1`. You should see `40`. If not, recheck SDA, SCL and the shared ground.
-
-**`Permission denied` on GPIO, SPI or I2C.** Reboot after running `setup.sh` so your user's new groups take effect.
-
-**Ash keeps recording or cuts you off.** Raise or lower `silence_threshold` in the settings. A noisy room needs a higher value.
-
-**Gemini errors.** Check that the key in `.env` is right. If the configured model has been retired, Ash switches to another Flash model and prints which one it picked.
-
-## Safety
-
-The servos are strong enough to pinch. Keep fingers clear while it runs, and unplug the servo supply before changing the wiring.
+Python, Gradio, Google Gemini API, edge-tts, GitHub Actions, Hugging Face Spaces. The hardware version adds a Raspberry Pi 5, an SPI LCD driver written from scratch, and PCA9685 servo control.
