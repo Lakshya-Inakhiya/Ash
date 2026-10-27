@@ -43,3 +43,7 @@ Thumbs.db
 *.tmp
 temp_audio_*.mp3
 
+
+# Local tooling
+.pytest_cache/
+.gradio/

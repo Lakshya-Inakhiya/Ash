@@ -1,0 +1,13 @@
+google-genai>=1.0
+edge-tts>=7.0
+pyyaml>=6.0
+python-dotenv>=1.0
+pygame>=2.5
+sounddevice>=0.4.6
+numpy>=1.26
+pillow>=10.0
+adafruit-blinka>=8.0
+adafruit-circuitpython-pca9685>=3.4
+adafruit-circuitpython-motor>=3.4
+spidev>=3.6
+gpiod>=2.1

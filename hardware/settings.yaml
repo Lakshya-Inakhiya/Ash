@@ -1,0 +1,30 @@
+# Raspberry Pi robot settings. Brain settings (Gemini, gestures) are in config/settings.yaml.
+
+display:
+  resolution: {width: 480, height: 320}
+  faces_directory: hardware/faces
+  # 3.5" ILI9486 SPI LCD (goodtft MPI3501 / Waveshare 3.5" A)
+  spi:
+    bus: 0
+    device: 0
+    dc_pin: 24          # GPIO numbers, not header pin numbers
+    rst_pin: 25
+    bl_pin: 18
+    speed_hz: 16000000  # raise to 32000000 if your panel handles it
+    rotation: 1         # 0-3, 1 = landscape
+    register_width: 16  # 16 for MPI3501/Waveshare boards, 8 for bare ILI9486 modules
+
+servos:
+  i2c_address: 0x40
+  pwm_frequency: 50
+  channels: {left_arm: 0, right_arm: 1}
+  pulse_range: {min: 500, max: 2500}  # microseconds, MG995
+  transition_speed: 0.3               # seconds per move
+
+audio:
+  timeout: 5              # seconds to wait for you to start talking
+  phrase_time_limit: 10   # max seconds per recording
+  silence_seconds: 1.0    # stop recording after this much quiet
+  silence_threshold: 500  # minimum loudness counted as speech (auto-raised for noisy rooms)
+
+cooldown_period: 1  # seconds to pause after answering

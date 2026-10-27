@@ -1,60 +1,20 @@
-# Ash Robot Configuration
+# Ash's brain settings, shared by the web app and the Raspberry Pi robot.
 
-# Face Display Settings
-display:
-  framebuffer_path: "/dev/fb1"  # LCD framebuffer device
-  resolution:
-    width: 480
-    height: 320
-  faces_directory: "assets/faces"
-  # SPI LCD Configuration (for Raspberry Pi 5)
-  spi:
-    bus: 0              # SPI bus number
-    device: 0           # SPI device number
-    dc_pin: 24          # Data/Command pin (GPIO)
-    rst_pin: 25         # Reset pin (GPIO)
-    bl_pin: 18          # Backlight pin (GPIO)
-    speed_hz: 32000000  # SPI speed in Hz (32 MHz)
-    rotation: 1         # Display rotation (0-3, where 1 = 90 degrees)
-
-# Servo/Gesture Settings
-servos:
-  i2c_address: 0x40
-  pwm_frequency: 50  # Hz, standard for servos
-  channels:
-    left_arm: 0
-    right_arm: 1
-  # Pulse width values for MG995 servos (microseconds)
-  pulse_range:
-    min: 500    # 0 degrees
-    max: 2500   # 180 degrees
-    center: 1500  # 90 degrees
-  # Safe angle definitions (degrees)
-  angles:
-    arms_up: 45
-    arms_down: 135
-    neutral: 90
-    wave_start: 60
-    wave_end: 120
-    point_up: 45
-  # Movement speed (seconds for transition)
-  transition_speed: 0.3
-
-# Audio Settings
-audio:
-  timeout: 5  # seconds to wait for speech
-  phrase_time_limit: 10  # max seconds to record
-  language: "en"  # language code for TTS
-  tts_slow: false  # speak slowly if true
-
-# LLM Settings
 llm:
-  model: "gemini-2.0-flash-exp"
-  system_instruction: "You are Ash, a helpful desktop robot. Give very concise answers in 1-2 sentences."
-  max_tokens: 100  # keep responses short
+  # "gemini-flash-latest" always points at Google's current Flash model (free tier works).
+  # If a model set here gets retired, Ash switches to another Flash model by itself.
+  model: gemini-flash-latest
+  system_instruction: >-
+    You are Ash, a small, friendly desktop robot. Answer in 1-2 short sentences.
+    Your replies are spoken aloud, so don't use markdown, lists or emoji.
 
-# Main Loop Settings
-main:
-  cooldown_period: 3  # seconds to wait after speaking before listening again
-  startup_expression: "neutral"
+voice: en-US-AnaNeural  # any voice from `edge-tts --list-voices`
 
+# Gesture poses in servo degrees: 135 is arm down, 45 is arm up.
+gestures:
+  neutral: 90
+  arms_up: 45
+  arms_down: 135
+  wave_start: 60
+  wave_end: 120
+  point_up: 45
